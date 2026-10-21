@@ -1,0 +1,157 @@
+cat << 'EOF' > index.html
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IdolCart - Wishlist & Username Base</title>
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Swiper CSS untuk Slider/Carousel -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+    
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #ffffff; padding: 15px; }
+        
+        /* Card User Telegram */
+        .user-card { background: #1e293b; padding: 12px 15px; border-radius: 12px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+        .user-card img { width: 45px; height: 45px; border-radius: 50%; }
+
+        /* Style Slider Icon Profil ala App HP */
+        .swiper { width: 100%; padding: 10px 0; margin-bottom: 25px; }
+        .swiper-slide { width: auto; }
+        .app-icon { 
+            width: 70px; 
+            height: 70px; 
+            border-radius: 18px; /* Sudut melengkung khas Icon HP */
+            object-fit: cover; 
+            border: 2px solid #3b82f6; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        /* List Username & Leaderboard */
+        .username-card { background: #1e293b; padding: 12px 15px; border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .badge { background: #3b82f6; color: #fff; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; }
+        .wish-btn { background: #10b981; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <!-- Profil Pengunjung Telegram -->
+    <div class="user-card">
+        <img id="user-photo" src="https://via.placeholder.com/45" alt="Avatar">
+        <div>
+            <h4 id="user-name">Pengunjung</h4>
+            <small id="user-id" style="color: #94a3b8;">@username</small>
+        </div>
+    </div>
+
+    <!-- Slider Foto Profil Channel Bergeser Otomatis -->
+    <h3 style="margin-bottom: 10px; font-size: 16px;">🔥 Base Icon Showcase</h3>
+    <div class="swiper myIconsSlider">
+        <div class="swiper-wrapper" id="icon-slider-container">
+            <!-- Foto profil channel dari Supabase akan diisi di sini -->
+        </div>
+    </div>
+
+    <!-- Leaderboard / List Wishlist -->
+    <h3 style="margin-bottom: 12px; font-size: 16px;">🏆 Incaran Username Base</h3>
+    <div id="username-list-container">
+        <!-- List item akan dimuat dari Supabase -->
+    </div>
+
+    <!-- Swiper JS -->
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
+    <script>
+        // 1. Inisialisasi Telegram WebApp SDK
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            const user = tg.initDataUnsafe.user;
+            document.getElementById('user-name').innerText = user.first_name + ' ' + (user.last_name || '');
+            document.getElementById('user-id').innerText = user.username ? '@' + user.username : 'ID: ' + user.id;
+            if (user.photo_url) {
+                document.getElementById('user-photo').src = user.photo_url;
+            }
+        }
+
+        // 2. Kredensial Supabase Kustom
+        const SUPABASE_URL = "https://ilggrnuwcjqssxhhvolc.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_nBFbzV_2TxZ7I9gpUjgBsQ_Z_EzkwU_";
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // 3. Fungsi Ambil Data dari Supabase
+        async function loadData() {
+            const { data, error } = await _supabase
+                .from('usernames')
+                .select('*')
+                .order('wish_count', { ascending: false });
+
+            if (error) {
+                console.error("Gagal mengambil data:", error);
+                return;
+            }
+
+            const sliderContainer = document.getElementById('icon-slider-container');
+            const listContainer = document.getElementById('username-list-container');
+
+            sliderContainer.innerHTML = '';
+            listContainer.innerHTML = '';
+
+            data.forEach(item => {
+                // Isi Icon Slider
+                const imgUrl = item.foto_profil || 'https://via.placeholder.com/70';
+                sliderContainer.innerHTML += `
+                    <div class="swiper-slide">
+                        <img src="${imgUrl}" class="app-icon" title="${item.username}">
+                    </div>
+                `;
+
+                // Isi List Leaderboard
+                listContainer.innerHTML += `
+                    <div class="username-card">
+                        <div>
+                            <span class="badge">${item.group_idol}</span>
+                            <div style="font-weight: bold; margin-top: 4px;">${item.username}</div>
+                            <small style="color: #94a3b8;">Subs: ${item.subscribers || 0} | Wish: ${item.wish_count || 0}</small>
+                        </div>
+                        <button class="wish-btn" onclick="tambahWish(${item.id}, ${item.wish_count})">+ Wish</button>
+                    </div>
+                `;
+            });
+
+            // Jalankan Slider Bergeser Otomatis
+            new Swiper(".myIconsSlider", {
+                slidesPerView: "auto",
+                spaceBetween: 12,
+                loop: true,
+                autoplay: {
+                    delay: 1500,
+                    disableOnInteraction: false,
+                },
+            });
+        }
+
+        // 4. Fungsi Tambah Wish
+        async function tambahWish(id, currentWish) {
+            const { error } = await _supabase
+                .from('usernames')
+                .update({ wish_count: currentWish + 1 })
+                .eq('id', id);
+
+            if (!error) {
+                loadData();
+            }
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
+EOF
+
